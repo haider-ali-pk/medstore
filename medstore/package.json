@@ -1,0 +1,9 @@
+{
+  "name": "medstore",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-brand medical storefront. Run everything with: npm start",
+  "scripts": {
+    "start": "node scripts/run.js"
+  }
+}
