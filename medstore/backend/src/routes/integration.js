@@ -16,7 +16,7 @@
 const router = require("express").Router();
 const crypto = require("crypto");
 const { z } = require("zod");
-const { prisma } = require("../lib");
+const { prisma, slugify } = require("../lib");
 const { brandAnalytics } = require("../analytics");
 const svc = require("../services");
 const { signedUrl } = require("../storage");
@@ -167,5 +167,82 @@ router.post("/products", pickBrand, async (req, res) => res.status(201).json(awa
 router.put("/products/:id", pickBrand, async (req, res) => res.json(await svc.updateProduct(req.brand, req.params.id, req.body)));
 router.patch("/products/:id/stock", pickBrand, async (req, res) => res.json(await svc.adjustStock(req.brand, req.params.id, req.body || {})));
 router.delete("/products/:id", pickBrand, async (req, res) => res.json(await svc.deleteProduct(req.brand, req.params.id)));
+/* ---------- store info & pages (MediCore "Store info & pages" tab) ---------- */
+const optT = (n) => z.string().max(n).optional().nullable().or(z.literal(""));
+const money = z.coerce.number().min(0).max(1_000_000);
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/).optional();
+const brandSchema = z.object({
+  name: z.string().min(2).optional(),
+  tagline: optT(200),
+  logoUrl: z.string().url().optional().nullable().or(z.literal("")),
+  primaryColor: hex,
+  accentColor: hex,
+  phone: optT(30),
+  whatsapp: optT(30),
+  email: z.string().email().optional().nullable().or(z.literal("")),
+  address: optT(200),
+  licenseNo: optT(60),
+  openingHours: optT(80),
+  deliveryFee: money.optional(),
+  freeDeliveryOver: z.union([money, z.literal(""), z.null()]).optional(),
+  codEnabled: z.boolean().optional(),
+  walletEnabled: z.boolean().optional(),
+  cardEnabled: z.boolean().optional(),
+  paymentInstructions: optT(500),
+  aboutText: optT(20000),
+  termsText: optT(20000),
+  privacyText: optT(20000),
+  returnPolicy: optT(20000),
+  shippingPolicy: optT(20000),
+});
 
+// The panel's form expects plain values: no nulls, numbers instead of decimals.
+// (freeDeliveryOver must be "" when empty, otherwise the panel would save it as 0 = free delivery on everything.)
+const shapeStore = (b) => {
+  const o = {};
+  for (const [k, v] of Object.entries(b)) o[k] = v === null ? "" : v;
+  o.deliveryFee = Number(b.deliveryFee || 0);
+  o.freeDeliveryOver = b.freeDeliveryOver == null ? "" : Number(b.freeDeliveryOver);
+  return o;
+};
+
+router.get("/store", pickBrand, (req, res) => res.json(shapeStore(req.brand)));
+
+router.put("/store", pickBrand, async (req, res) => {
+  const r = brandSchema.safeParse(req.body || {});
+  if (!r.success) return res.status(400).json({ error: r.error.issues[0].message });
+  const brand = await prisma.brand.update({ where: { id: req.brand.id }, data: svc.clean(r.data) });
+  svc.afterChange(brand.id);
+  res.json(shapeStore(brand));
+});
+
+
+
+/* ---------- categories (so "Other Accessories" etc. can be created from MediCore) ---------- */
+router.get("/categories", pickBrand, async (req, res) =>
+  res.json(await prisma.category.findMany({ where: { brandId: req.brand.id }, orderBy: { name: "asc" }, include: { _count: { select: { products: true } } } }))
+);
+router.post("/categories", pickBrand, async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "Name required" });
+  const slug = slugify(name);
+  const found = await prisma.category.findUnique({ where: { brandId_slug: { brandId: req.brand.id, slug } } });
+  if (found) return res.json(found); // already exists: treat as success
+  const c = await prisma.category.create({ data: { brandId: req.brand.id, name, slug } });
+  svc.afterChange(req.brand.id);
+  res.status(201).json(c);
+});
+router.put("/categories/:id", pickBrand, async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "Name required" });
+  const r = await prisma.category.updateMany({ where: { id: req.params.id, brandId: req.brand.id }, data: { name, slug: slugify(name) } });
+  if (!r.count) return res.status(404).json({ error: "Not found" });
+  svc.afterChange(req.brand.id);
+  res.json({ ok: true });
+});
+router.delete("/categories/:id", pickBrand, async (req, res) => {
+  await prisma.category.deleteMany({ where: { id: req.params.id, brandId: req.brand.id } });
+  svc.afterChange(req.brand.id);
+  res.json({ ok: true });
+});
 module.exports = router;
