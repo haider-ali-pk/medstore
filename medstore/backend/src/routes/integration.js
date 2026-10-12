@@ -249,6 +249,8 @@ router.delete("/categories/:id", pickBrand, async (req, res) => {
 /* ---------- STORES (super admin in MediCore): add stores, their admins and their branches ---------- */
 const oT = (n) => z.string().max(n).optional().nullable().or(z.literal(""));
 const randomPassword = () => crypto.randomBytes(9).toString("base64url");
+// "https://Shop.Client.com/" -> "shop.client.com"
+const cleanDomain = (d) => String(d || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 
 const storeCreateSchema = z.object({
   name: z.string().min(2, "Store name is required"),
@@ -286,6 +288,7 @@ router.post("/stores", async (req, res) => {
   const { adminEmail, adminName, adminPassword, slug, ...data } = p.data;
   const finalSlug = slugify(slug || data.name);
   if (!finalSlug) return res.status(400).json({ error: "Enter a store name" });
+  if (data.domain) data.domain = cleanDomain(data.domain);
   if (await prisma.brand.findUnique({ where: { slug: finalSlug } })) return res.status(409).json({ error: "A store with this slug already exists" });
   if (data.domain && (await prisma.brand.findUnique({ where: { domain: data.domain } }))) return res.status(409).json({ error: "That domain is already used by another store" });
 
@@ -300,6 +303,30 @@ router.post("/stores", async (req, res) => {
   });
   svc.afterChange(brand.id);
   res.status(201).json({ brand: { id: brand.id, slug: brand.slug, name: brand.name }, credentials: { email: adminEmail.toLowerCase(), password, slug: brand.slug } });
+});
+
+// edit a store's name and domain
+router.put("/stores/:id", async (req, res) => {
+  const p = z
+    .object({ name: z.string().min(2, "Store name is required").optional(), domain: z.string().optional().nullable().or(z.literal("")) })
+    .safeParse(req.body || {});
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  const b = await prisma.brand.findUnique({ where: { id: req.params.id } });
+  if (!b) return res.status(404).json({ error: "Store not found" });
+
+  const data = {};
+  if (p.data.name !== undefined) data.name = p.data.name.trim();
+  if (p.data.domain !== undefined) {
+    const domain = cleanDomain(p.data.domain) || null;
+    if (domain) {
+      const used = await prisma.brand.findUnique({ where: { domain } });
+      if (used && used.id !== b.id) return res.status(409).json({ error: "That domain is already used by another store" });
+    }
+    data.domain = domain;
+  }
+  const brand = await prisma.brand.update({ where: { id: b.id }, data });
+  svc.afterChange(brand.id);
+  res.json({ ok: true, id: brand.id, name: brand.name, domain: brand.domain });
 });
 
 router.post("/stores/:id/toggle", async (req, res) => {
