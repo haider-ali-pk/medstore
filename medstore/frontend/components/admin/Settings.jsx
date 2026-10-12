@@ -2,6 +2,12 @@
 import { useEffect, useState } from "react";
 import ImageUpload from "../ImageUpload";
 
+// Defined OUTSIDE Settings on purpose: a component created inside another component is a "new" component on every
+// keystroke, so React rebuilt the form and the text box lost focus after each character.
+const Section = ({ title, children }) => (
+  <section className="card space-y-4 p-6"><h2 className="text-lg font-bold">{title}</h2>{children}</section>
+);
+
 export default function Settings({ call, notify }) {
   const [f, setF] = useState(null);
   const [uploads, setUploads] = useState(false);
@@ -40,9 +46,7 @@ export default function Settings({ call, notify }) {
     setBusy(false);
   }
 
-  const Section = ({ title, children }) => (
-    <section className="card space-y-4 p-6"><h2 className="text-lg font-bold">{title}</h2>{children}</section>
-  );
+ 
 
   return (
     <form onSubmit={save} className="mx-auto max-w-3xl space-y-6">
