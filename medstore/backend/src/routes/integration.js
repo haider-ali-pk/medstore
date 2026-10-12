@@ -38,7 +38,14 @@ async function pickBrand(req, res, next) {
     const all = await prisma.brand.findMany({ where: { isActive: true }, take: 2 });
     if (all.length === 1) brand = all[0];
   }
-  if (!brand) return res.status(400).json({ error: "Store not found. Pass ?brand=<slug> or set INTEGRATION_DEFAULT_BRAND." });
+  if (!brand) {
+    const known = (await prisma.brand.findMany({ select: { slug: true } })).map((b) => b.slug).join(", ");
+    return res.status(400).json({
+      error: slug
+        ? `Store "${slug}" does not exist. Available store slugs: ${known}`
+        : `No store selected. Set MEDSTORE_BRAND in MediCore to one of: ${known}`,
+    });
+  }
   req.brand = brand;
   next();
 }
