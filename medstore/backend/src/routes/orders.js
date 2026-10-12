@@ -20,21 +20,6 @@ const orderSchema = z.object({
   prescriptionPath: z.string().max(200).optional(),
 });
 
-const orderPayload = (o, brand) => ({
-  orderId: o.id,
-  brand: { id: brand.id, slug: brand.slug, name: brand.name },
-  status: o.status,
-  paymentMethod: o.paymentMethod,
-  paymentStatus: o.paymentStatus,
-  currency: brand.currency,
-  subtotal: Number(o.subtotal),
-  deliveryFee: Number(o.deliveryFee),
-  total: Number(o.total),
-  city: o.shipCity,
-  items: (o.items || []).map((i) => ({ name: i.name, quantity: i.quantity, unitPrice: Number(i.unitPrice) })),
-  createdAt: o.createdAt,
-});
-
 // Place an order. Prices and delivery fee are always calculated on the server, never trusted from the client.
 router.post("/", auth(), async (req, res) => {
   const parsed = orderSchema.safeParse(req.body);
