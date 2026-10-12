@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/format";
-
+import SuperEditStore from "@/components/SuperEditStore";
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 const TOKEN_KEY = "super:token";
 
@@ -17,15 +17,25 @@ async function req(path, { method = "GET", body } = {}) {
   return data;
 }
 
+const EMPTY = {
+  name: "", slug: "", domain: "", tagline: "", primaryColor: "#0f766e", accentColor: "#0ea5e9", currency: "PKR",
+  phone: "", whatsapp: "", email: "", address: "", licenseNo: "", openingHours: "",
+  walletEnabled: true, adminEmail: "",
+};
+const EDITABLE = ["name", "domain", "tagline", "primaryColor", "accentColor", "currency", "phone", "whatsapp", "email", "address", "licenseNo", "openingHours", "walletEnabled"];
+
 export default function SuperAdmin() {
   const [authed, setAuthed] = useState(null); // null = checking
   const [brands, setBrands] = useState([]);
   const [overview, setOverview] = useState([]);
   const [login, setLogin] = useState({ email: "", password: "" });
-  const empty = { name: "", slug: "", domain: "", tagline: "", primaryColor: "#0f766e", accentColor: "#0ea5e9", currency: "PKR", walletEnabled: true, adminEmail: "" };
-  const [f, setF] = useState(empty);
+  const [f, setF] = useState(EMPTY);
+  const [editId, setEditId] = useState(null); // null = creating a new store
   const [creds, setCreds] = useState(null);
   const [err, setErr] = useState("");
+    const [editing, setEditing] = useState(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -43,20 +53,45 @@ export default function SuperAdmin() {
       load();
     } catch (e2) { setErr(e2.message); }
   }
-  async function create(e) {
-    e.preventDefault(); setErr("");
-    try {
-      const r = await req("/brands", { method: "POST", body: { ...f, domain: f.domain || null, slug: f.slug || undefined } });
-      setCreds({ ...r.credentials, name: r.brand.name });
-      setF(empty); load();
-    } catch (e2) { setErr(e2.message); }
+
+  function startEdit(b) {
+    setEditId(b.id); setErr(""); setNote("");
+    const next = { ...EMPTY, slug: b.slug };
+    for (const k of EDITABLE) next[k] = b[k] == null ? (k === "walletEnabled" ? false : "") : b[k];
+    setF(next);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
+  function cancelEdit() { setEditId(null); setF(EMPTY); setErr(""); }
+
+  async function submit(e) {
+    e.preventDefault(); setErr(""); setNote(""); setBusy(true);
+    try {
+      if (editId) {
+        const body = Object.fromEntries(EDITABLE.map((k) => [k, f[k]]));
+        body.domain = f.domain || null;
+        await req(`/brands/${editId}`, { method: "PATCH", body });
+        setNote("Store updated. The website shows the change within a minute or two.");
+        setEditId(null); setF(EMPTY);
+      } else {
+        const r = await req("/brands", { method: "POST", body: { ...f, domain: f.domain || null, slug: f.slug || undefined } });
+        setCreds({ ...r.credentials, name: r.brand.name });
+        setF(EMPTY);
+      }
+      load();
+    } catch (e2) { setErr(e2.message); }
+    setBusy(false);
+  }
+
   async function reset(id) {
     const r = await req(`/brands/${id}/reset-admin-password`, { method: "POST" });
     setCreds({ ...r, loginSlug: "(unchanged)", name: "Password reset" });
   }
   const toggle = async (id) => { await req(`/brands/${id}/toggle`, { method: "POST" }); load(); };
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
+  // plain function (not a component) so inputs keep focus while typing
+  const field = (k, placeholder, props = {}) => (
+    <input key={k} className="input" placeholder={placeholder} value={f[k] ?? ""} onChange={set(k)} {...props} />
+  );
 
   if (authed === null) return <div className="skeleton mx-auto h-64 max-w-sm" />;
 
@@ -89,6 +124,8 @@ export default function SuperAdmin() {
         ))}
       </div>
 
+      {note && <p className="rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-800">{note}</p>}
+
       {creds && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm">
           <p className="font-bold">{creds.name} — save these credentials now, they are shown only once.</p>
@@ -100,21 +137,29 @@ export default function SuperAdmin() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <form onSubmit={create} className="card h-fit space-y-3 p-5">
-          <h2 className="font-bold">Create store / client</h2>
-          <input className="input" placeholder="Store name" required value={f.name} onChange={set("name")} />
-          <input className="input" placeholder="Slug (optional)" value={f.slug} onChange={set("slug")} />
-          <input className="input" placeholder="Domain e.g. shop.client.com (optional)" value={f.domain} onChange={set("domain")} />
-          <input className="input" placeholder="Tagline" value={f.tagline} onChange={set("tagline")} />
+        <form onSubmit={submit} className="card h-fit space-y-3 p-5">
+          <h2 className="font-bold">{editId ? `Edit store: ${f.slug}` : "Create store / client"}</h2>
+          {field("name", "Store name", { required: true })}
+          {!editId && field("slug", "Slug (optional)")}
+          {field("domain", "Domain e.g. shop.client.com (optional)")}
+          {field("tagline", "Tagline")}
+          {field("phone", "Phone e.g. +92 300 1234567")}
+          {field("whatsapp", "WhatsApp e.g. 923001234567")}
+          {field("email", "Store email (shown on website)", { type: "email" })}
+          {field("address", "Address")}
+          {field("licenseNo", "Pharmacy licence no. (DRAP)")}
+          {field("openingHours", "Opening hours e.g. Mon–Sat 9am–11pm")}
           <div className="flex items-center gap-3 text-sm">
             <label>Main <input type="color" value={f.primaryColor} onChange={set("primaryColor")} /></label>
             <label>Accent <input type="color" value={f.accentColor} onChange={set("accentColor")} /></label>
             <input className="input !w-20" maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} />
           </div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.walletEnabled} onChange={set("walletEnabled")} /> JazzCash / Easypaisa payments</label>
-          <input className="input" type="email" placeholder="Store admin email" required value={f.adminEmail} onChange={set("adminEmail")} />
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.walletEnabled} onChange={set("walletEnabled")} /> JazzCash / Easypaisa payments</label>
+          {!editId && field("adminEmail", "Store admin email", { type: "email", required: true })}
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <button className="btn btn-primary w-full">Create store + admin login</button>
+          <button className="btn btn-primary w-full" disabled={busy}>{busy ? "Saving…" : editId ? "Save changes" : "Create store + admin login"}</button>
+          {editId && <button type="button" className="btn btn-outline w-full" onClick={cancelEdit}>Cancel</button>}
+          {editId && <p className="text-xs text-slate-400">Terms, Privacy, Returns and Delivery text are edited inside the store: Admin panel → Settings.</p>}
         </form>
 
         <div className="card overflow-x-auto">
@@ -131,6 +176,8 @@ export default function SuperAdmin() {
                     <td className="td font-semibold">{formatMoney(o?.totals.revenue || 0, b.currency)}</td>
                     <td className="td"><span className={`badge ${b.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-600"}`}>{b.isActive ? "Active" : "Disabled"}</span></td>
                     <td className="td space-x-3 text-right">
+                      <button className="font-semibold text-brand hover:underline" onClick={() => startEdit(b)}>Edit</button>
+                   
                       <button className="font-semibold text-brand hover:underline" onClick={() => toggle(b.id)}>{b.isActive ? "Disable" : "Enable"}</button>
                       <button className="font-semibold text-brand hover:underline" onClick={() => reset(b.id)}>Reset admin pw</button>
                     </td>
@@ -141,9 +188,9 @@ export default function SuperAdmin() {
           </table>
         </div>
       </div>
-
+      {editing && <SuperEditStore brand={editing} req={req} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
       <p className="text-sm text-slate-500">
-        To manage a store's products, orders and settings, open that store's website and log in at <code>/login</code> with this same super-admin email — you'll land in its Admin panel.
+        To manage a store's products, orders and legal pages, open that store's website and log in at <code>/login</code> with this same super-admin email — you'll land in its Admin panel.
       </p>
     </div>
   );

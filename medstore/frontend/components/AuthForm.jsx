@@ -12,11 +12,13 @@ export default function AuthForm({ mode }) {
   const [f, setF] = useState({ name: "", email: "", password: "", phone: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+    const [agree, setAgree] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e) {
     e.preventDefault();
     setErr("");
+    if (isRegister && !agree) return setErr("Please accept the Terms & Conditions and Privacy Policy to continue.");
     setBusy(true);
     try {
       const r = await call(isRegister ? "/auth/register" : "/auth/login", {
@@ -60,6 +62,12 @@ export default function AuthForm({ mode }) {
           <div><label className="label">Password</label><input type="password" className="input" required minLength={isRegister ? 8 : 1} value={f.password} onChange={set("password")} autoComplete={isRegister ? "new-password" : "current-password"} />
             {isRegister && <p className="mt-1 text-xs text-slate-400">At least 8 characters.</p>}
           </div>
+                    {isRegister && (
+            <label className="flex items-start gap-2 text-sm text-slate-600">
+              <input type="checkbox" className="mt-1 accent-[rgb(var(--brand))]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <span>I agree to the <Link href="/terms" target="_blank" className="font-semibold text-brand">Terms & Conditions</Link> and <Link href="/privacy" target="_blank" className="font-semibold text-brand">Privacy Policy</Link>.</span>
+            </label>
+          )}
           {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
           <button className="btn btn-primary w-full !py-3" disabled={busy}>{busy ? "Please wait…" : isRegister ? "Create account" : "Log in"}</button>
         </form>

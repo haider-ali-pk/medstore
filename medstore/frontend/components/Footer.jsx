@@ -1,17 +1,27 @@
 "use client";
+// frontend/components/Footer.jsx   (REPLACE THE WHOLE FILE)
 import Link from "next/link";
 import { useStore } from "./Providers";
 import { Phone, Mail, Pin, Whatsapp } from "./Icons";
+
+const HELP = [
+  ["/about", "About us"],
+  ["/contact", "Contact us"],
+  ["/terms", "Terms & Conditions"],
+  ["/privacy", "Privacy Policy"],
+  ["/returns", "Returns & Refunds"],
+  ["/shipping", "Shipping & Delivery"],
+];
 
 export default function Footer() {
   const { brand, categories } = useStore();
   return (
     <>
       <footer className="mt-16 border-t border-slate-200 bg-white">
-        <div className="container-x grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="lg:col-span-1">
+        <div className="container-x grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
             <p className="text-lg font-extrabold text-slate-900">{brand.name}</p>
-            <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-500">{brand.tagline || "Genuine medicines and healthcare essentials, delivered."}</p>
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-slate-500">{brand.tagline || "Genuine healthcare products, delivered."}</p>
           </div>
           <div>
             <p className="mb-3 text-sm font-bold text-slate-900">Shop</p>
@@ -32,10 +42,18 @@ export default function Footer() {
             </ul>
           </div>
           <div>
+            <p className="mb-3 text-sm font-bold text-slate-900">Help</p>
+            <ul className="space-y-2 text-sm text-slate-500">
+              {HELP.map(([href, label]) => (
+                <li key={href}><Link href={href} className="hover:text-brand">{label}</Link></li>
+              ))}
+            </ul>
+          </div>
+          <div>
             <p className="mb-3 text-sm font-bold text-slate-900">Contact us</p>
             <ul className="space-y-2.5 text-sm text-slate-500">
               {brand.phone && <li className="flex items-start gap-2"><Phone size={16} className="mt-0.5 shrink-0 text-brand" /><a href={`tel:${brand.phone.replace(/\s/g, "")}`} className="hover:text-brand">{brand.phone}</a></li>}
-              {brand.email && <li className="flex items-start gap-2"><Mail size={16} className="mt-0.5 shrink-0 text-brand" /><a href={`mailto:${brand.email}`} className="hover:text-brand">{brand.email}</a></li>}
+              {brand.email && <li className="flex items-start gap-2"><Mail size={16} className="mt-0.5 shrink-0 text-brand" /><a href={`mailto:${brand.email}`} className="break-all hover:text-brand">{brand.email}</a></li>}
               {brand.address && <li className="flex items-start gap-2"><Pin size={16} className="mt-0.5 shrink-0 text-brand" /><span>{brand.address}</span></li>}
               {brand.openingHours && <li><b className="text-slate-700">Open:</b> {brand.openingHours}</li>}
               {!brand.phone && !brand.email && !brand.address && <li>Contact details coming soon.</li>}

@@ -51,6 +51,11 @@ model Brand {
     address             String?
   licenseNo           String?  // pharmacy / DRAP licence number, shown in the website footer
   openingHours        String?  // e.g. "Mon–Sat 9am–11pm"
+    aboutText           String?  @db.Text
+  termsText           String?  @db.Text
+  privacyText         String?  @db.Text
+  returnPolicy        String?  @db.Text
+  shippingPolicy      String?  @db.Text
   deliveryFee         Decimal  @default(250) @db.Decimal(10, 2)
   freeDeliveryOver    Decimal? @default(5000) @db.Decimal(10, 2)
   codEnabled          Boolean  @default(true)

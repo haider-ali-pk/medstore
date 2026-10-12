@@ -21,6 +21,8 @@ export default function Settings({ call, notify }) {
         phone: b.phone || "", whatsapp: b.whatsapp || "", email: b.email || "", address: b.address || "", licenseNo: b.licenseNo || "", openingHours: b.openingHours || "",
         deliveryFee: Number(b.deliveryFee || 0), freeDeliveryOver: b.freeDeliveryOver == null ? "" : Number(b.freeDeliveryOver),
         codEnabled: b.codEnabled, walletEnabled: b.walletEnabled, cardEnabled: b.cardEnabled, paymentInstructions: b.paymentInstructions || "",
+                aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "",
+        aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "",
       });
     }).catch((e) => notify(e.message, "err"));
   }, [call, notify]);
@@ -88,7 +90,13 @@ export default function Settings({ call, notify }) {
         )}
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[rgb(var(--brand))]" checked={f.cardEnabled} onChange={set("cardEnabled")} /> Online card payment (needs a payment gateway key on the server)</label>
       </Section>
-
+      <Section title="Website pages (About, Terms, Privacy, Returns, Delivery)">
+        <p className="text-sm text-slate-500">Leave a box empty to show the built-in professional text. Type your own to replace it. Use "## " at the start of a line for a heading and "- " for a bullet point.</p>
+        {[["aboutText", "About us"], ["termsText", "Terms & Conditions"], ["privacyText", "Privacy Policy"], ["returnPolicy", "Returns & Refunds"], ["shippingPolicy", "Delivery Policy"]].map(([k, label]) => (
+          <div key={k}><label className="label">{label}</label><textarea className="input font-mono text-xs" rows={7} value={f[k]} onChange={set(k)} /></div>
+        ))}
+      </Section>
+      
       <div className="flex justify-end"><button className="btn btn-primary !px-8 !py-3" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button></div>
     </form>
   );

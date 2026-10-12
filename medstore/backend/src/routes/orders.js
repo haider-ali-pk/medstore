@@ -20,6 +20,8 @@ const orderSchema = z.object({
   prescriptionPath: z.string().max(200).optional(),
 });
 
+
+
 // Place an order. Prices and delivery fee are always calculated on the server, never trusted from the client.
 router.post("/", auth(), async (req, res) => {
   const parsed = orderSchema.safeParse(req.body);

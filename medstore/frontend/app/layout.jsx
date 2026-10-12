@@ -7,7 +7,7 @@ import { getBrand, sfetch, hexToRgb } from "@/lib/server";
 export async function generateMetadata() {
   const brand = await getBrand();
   return {
-    title: { default: brand ? `${brand.name} — Online Pharmacy & Medical Store` : "Store", template: `%s | ${brand?.name || "Store"}` },
+    title: { default: brand ? `${brand.name} — Pharmacy, Health & Accessories Store` : "Store", template: `%s | ${brand?.name || "Store"}` },
     description: brand?.tagline || "Genuine medicines, devices and health essentials delivered to your door.",
   };
 }

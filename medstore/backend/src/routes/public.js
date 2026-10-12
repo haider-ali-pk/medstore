@@ -127,6 +127,13 @@ router.get("/products/:slug", async (req, res) => {
   if (!product) return res.status(404).json({ error: "Product not found" });
   res.json(product);
 });
-
+// Text of the About / Terms / Privacy / Returns / Delivery pages (kept out of /brand so every page load stays small)
+router.get("/policies", (req, res) => {
+  const b = req.brand;
+  res.json({
+    aboutText: b.aboutText, termsText: b.termsText, privacyText: b.privacyText,
+    returnPolicy: b.returnPolicy, shippingPolicy: b.shippingPolicy,
+  });
+});
 module.exports = router;
 module.exports.publicBrand = publicBrand;

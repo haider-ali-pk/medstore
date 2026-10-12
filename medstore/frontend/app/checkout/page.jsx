@@ -22,6 +22,7 @@ export default function Checkout() {
   const rxInput = useRef(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   useEffect(() => {
@@ -167,8 +168,18 @@ export default function Checkout() {
           <div className="flex justify-between text-slate-600"><span>Delivery</span><span>{fee === 0 ? <b className="text-emerald-600">Free</b> : money(fee)}</span></div>
         </div>
         <div className="flex justify-between border-t pt-3 text-lg font-extrabold"><span>Total</span><span>{money(total)}</span></div>
+                <label className="flex items-start gap-2 text-xs text-slate-600">
+          <input type="checkbox" required className="mt-0.5 accent-[rgb(var(--brand))]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <span>
+            I agree to the <Link href="/terms" target="_blank" className="font-semibold text-brand">Terms &amp; Conditions</Link>,{" "}
+            <Link href="/privacy" target="_blank" className="font-semibold text-brand">Privacy Policy</Link> and{" "}
+            <Link href="/returns" target="_blank" className="font-semibold text-brand">Returns policy</Link>.
+          </span>
+        </label>
         {err && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
         <button className="btn btn-primary w-full !py-3" disabled={busy || rxBusy || methods.length === 0}>{busy ? "Placing order…" : `Place order · ${money(total)}`}</button>
+             <button className="btn btn-primary w-full !py-3" disabled={busy || rxBusy || methods.length === 0}>{busy ? "Placing order…" : `Place order · ${money(total)}`}</button>
+        <p className="text-center text-xs text-slate-400">By placing this order you agree to our <Link href="/terms" target="_blank" className="font-semibold text-brand">Terms</Link>, <Link href="/returns" target="_blank" className="font-semibold text-brand">Returns policy</Link> and <Link href="/shipping" target="_blank" className="font-semibold text-brand">Delivery policy</Link>.</p>
       </aside>
     </form>
   );

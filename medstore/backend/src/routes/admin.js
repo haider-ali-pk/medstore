@@ -62,6 +62,11 @@ const brandSchema = z.object({
     address: z.string().max(200).optional().nullable(),
   licenseNo: z.string().max(60).optional().nullable(),
   openingHours: z.string().max(80).optional().nullable(),
+  aboutText: z.string().max(20000).optional().nullable().or(z.literal("")),
+  termsText: z.string().max(20000).optional().nullable().or(z.literal("")),
+  privacyText: z.string().max(20000).optional().nullable().or(z.literal("")),
+  returnPolicy: z.string().max(20000).optional().nullable().or(z.literal("")),
+  shippingPolicy: z.string().max(20000).optional().nullable().or(z.literal("")),
   deliveryFee: money.optional(),
   freeDeliveryOver: money.optional().nullable(),
   codEnabled: z.boolean().optional(),
@@ -140,6 +145,7 @@ const settingsSchema = brandSchema
     name: true, tagline: true, logoUrl: true, primaryColor: true, accentColor: true, phone: true, whatsapp: true,
     email: true, address: true, licenseNo: true, openingHours: true, deliveryFee: true, freeDeliveryOver: true, codEnabled: true, cardEnabled: true,
     walletEnabled: true, paymentInstructions: true,
+    aboutText: true, termsText: true, privacyText: true, returnPolicy: true, shippingPolicy: true,
   })
   .partial();
 
