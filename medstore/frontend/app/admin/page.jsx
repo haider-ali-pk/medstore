@@ -7,13 +7,17 @@ import Products from "@/components/admin/Products";
 import Orders from "@/components/admin/Orders";
 import Settings from "@/components/admin/Settings";
 import Branches from "@/components/admin/Branches";
-import { Chart, Box, List, Cog, Pin } from "@/components/Icons";
+import Banners from "@/components/admin/Banners";
+import Coupons from "@/components/admin/Coupons";
+import { Chart, Box, List, Cog, Pin, Image as ImageIcon, Tag } from "@/components/Icons";
 
 const TABS = [
   ["dashboard", "Dashboard", Chart],
   ["products", "Products", Box],
   ["orders", "Orders", List],
-    ["branches", "Branches", Pin],
+      ["branches", "Branches", Pin],
+  ["banners", "Banners", ImageIcon],
+  ["coupons", "Coupons", Tag],
   ["settings", "Settings", Cog],
 ];
 
@@ -59,6 +63,8 @@ export default function Admin() {
         {tab === "products" && <ProductsTab {...common} />}
         {tab === "orders" && <Orders {...common} />}
                 {tab === "branches" && <Branches call={call} notify={notify} />}
+        {tab === "banners" && <Banners call={call} notify={notify} />}
+        {tab === "coupons" && <Coupons {...common} />}
         {tab === "settings" && <Settings call={call} notify={notify} />}
       </section>
     </div>

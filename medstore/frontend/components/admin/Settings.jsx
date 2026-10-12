@@ -21,8 +21,8 @@ export default function Settings({ call, notify }) {
         phone: b.phone || "", whatsapp: b.whatsapp || "", email: b.email || "", address: b.address || "", licenseNo: b.licenseNo || "", openingHours: b.openingHours || "",
         deliveryFee: Number(b.deliveryFee || 0), freeDeliveryOver: b.freeDeliveryOver == null ? "" : Number(b.freeDeliveryOver),
         codEnabled: b.codEnabled, walletEnabled: b.walletEnabled, cardEnabled: b.cardEnabled, paymentInstructions: b.paymentInstructions || "",
-                aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "",
-        aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "",
+                aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "", gaId: b.gaId || "",
+        aboutText: b.aboutText || "", termsText: b.termsText || "", privacyText: b.privacyText || "", returnPolicy: b.returnPolicy || "", shippingPolicy: b.shippingPolicy || "", gaId: b.gaId || "",
       });
     }).catch((e) => notify(e.message, "err"));
   }, [call, notify]);
@@ -96,7 +96,9 @@ export default function Settings({ call, notify }) {
           <div key={k}><label className="label">{label}</label><textarea className="input font-mono text-xs" rows={7} value={f[k]} onChange={set(k)} /></div>
         ))}
       </Section>
-      
+            <Section title="Google Analytics">
+        <div><label className="label">Measurement ID (looks like G-XXXXXXXXXX)</label><input className="input" placeholder="G-XXXXXXXXXX" value={f.gaId} onChange={set("gaId")} /></div>
+      </Section>
       <div className="flex justify-end"><button className="btn btn-primary !px-8 !py-3" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button></div>
     </form>
   );

@@ -1,5 +1,8 @@
 const router = require("express").Router();
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const { sendMail } = require("../notify");
+const { priceCoupon } = require("../coupons");
 const { z } = require("zod");
 const { prisma, signToken, resolveBrand, auth, cached, loginLimiter, publicUser } = require("../lib");
 
@@ -13,7 +16,7 @@ const publicBrand = (b) => ({
   deliveryFee: Number(b.deliveryFee || 0),
   freeDeliveryOver: b.freeDeliveryOver == null ? null : Number(b.freeDeliveryOver),
   codEnabled: b.codEnabled, cardEnabled: b.cardEnabled, walletEnabled: b.walletEnabled,
-  paymentInstructions: b.paymentInstructions,
+    paymentInstructions: b.paymentInstructions, gaId: b.gaId,
 });
 
 // ---- Brand info (theme, logo, contact, enabled payment methods)
@@ -145,6 +148,86 @@ router.get("/branches", async (req, res) =>
         select: { id: true, name: true, address: true, city: true, phone: true, whatsapp: true, openingHours: true, mapUrl: true },
       })
     )
+  )
+);
+/* ---------- Forgot / reset password ---------- */
+const sha = (s) => crypto.createHash("sha256").update(s).digest("hex");
+
+router.post("/auth/forgot", loginLimiter, async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Enter a valid email" });
+  const user = await prisma.user.findUnique({ where: { email_brandId: { email, brandId: req.brand.id } } });
+  if (user) {
+    const token = crypto.randomBytes(32).toString("hex");
+    await prisma.passwordReset.deleteMany({ where: { userId: user.id } });
+    await prisma.passwordReset.create({ data: { userId: user.id, tokenHash: sha(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000) } });
+    // The link never uses the request's Origin/Host (that could be faked): only the store's own domain or FRONTEND_URL.
+    const d = req.brand.domain;
+    const front = d && !/localhost/i.test(d) ? `https://${d}` : (process.env.FRONTEND_URL || "http://localhost:3000").split(",")[0].trim();
+    await sendMail({
+      to: user.email,
+      subject: `Reset your ${req.brand.name} password`,
+      brandName: req.brand.name,
+      text: `Hello ${user.name},\n\nUse this link to choose a new password. It works for 1 hour:\n${front}/reset-password?token=${token}\n\nIf you did not ask for this, you can ignore this email.`,
+    }).catch((e) => console.warn("Reset email failed:", e.message));
+  }
+  // same answer whether or not the account exists
+  res.json({ ok: true, message: "If that email has an account, we have sent a reset link. Check your inbox and spam folder." });
+});
+
+router.post("/auth/reset", loginLimiter, async (req, res) => {
+  const password = String(req.body?.password || "");
+  if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
+  const rec = await prisma.passwordReset.findUnique({ where: { tokenHash: sha(String(req.body?.token || "")) }, include: { user: true } });
+  if (!rec || rec.expiresAt < new Date() || rec.user.brandId !== req.brand.id)
+    return res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." });
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: rec.userId }, data: { passwordHash: await bcrypt.hash(password, 10) } }),
+    prisma.passwordReset.deleteMany({ where: { userId: rec.userId } }),
+  ]);
+  res.json({ ok: true });
+});
+
+/* ---------- Coupons, banners, branch stock, sitemap ---------- */
+router.post("/coupons/validate", loginLimiter, async (req, res) => {
+  const subtotal = Number(req.body?.subtotal);
+  if (!Number.isFinite(subtotal) || subtotal <= 0) return res.status(400).json({ error: "Your cart is empty" });
+  const { coupon, discount } = await priceCoupon(req.brand.id, req.body?.code, subtotal);
+  if (!coupon) return res.status(400).json({ error: "Enter a coupon code" });
+  res.json({ code: coupon.code, discount });
+});
+
+router.get("/banners", async (req, res) =>
+  res.json(
+    await cached(`pub:${req.brand.id}:banners`, 30_000, () =>
+      prisma.banner.findMany({
+        where: { brandId: req.brand.id, isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+        select: { id: true, title: true, subtitle: true, buttonText: true, linkUrl: true, imageUrl: true },
+      })
+    )
+  )
+);
+
+// how many of each cart item the chosen branch has: { productId: qty }
+router.get("/branches/:id/stock", async (req, res) => {
+  const ids = String(req.query.ids || "").split(",").filter(Boolean).slice(0, 100);
+  const rows = await prisma.branchStock.findMany({
+    where: { branchId: req.params.id, productId: { in: ids }, branch: { brandId: req.brand.id, isActive: true } },
+    select: { productId: true, stock: true },
+  });
+  res.json(Object.fromEntries(rows.map((r) => [r.productId, r.stock])));
+});
+
+router.get("/sitemap", async (req, res) =>
+  res.json(
+    await cached(`pub:${req.brand.id}:sitemap`, 300_000, async () => {
+      const [products, categories] = await Promise.all([
+        prisma.product.findMany({ where: { brandId: req.brand.id, isActive: true }, select: { slug: true, createdAt: true }, take: 5000 }),
+        prisma.category.findMany({ where: { brandId: req.brand.id }, select: { slug: true } }),
+      ]);
+      return { products, categories };
+    })
   )
 );
 module.exports = router;

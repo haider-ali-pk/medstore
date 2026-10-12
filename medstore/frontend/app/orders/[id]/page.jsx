@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useStore } from "@/components/Providers";
+import CancelOrderButton from "@/components/CancelOrderButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { orderRef } from "@/lib/format";
 
@@ -45,19 +46,21 @@ function Detail() {
             ))}
           </ol>
         )}
-
+        {o.status === "PENDING" && <div><CancelOrderButton order={o} onDone={setO} /></div>}
         <ul className="divide-y">
           {o.items.map((i) => (
             <li key={i.id} className="flex justify-between py-2.5 text-sm"><span>{i.name} × {i.quantity}</span><span className="font-medium">{money(i.quantity * Number(i.unitPrice))}</span></li>
           ))}
         </ul>
         <div className="space-y-1.5 border-t pt-3 text-sm">
-          <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{money(Number(o.total) - Number(o.deliveryFee || 0))}</span></div>
+                    <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{money(o.subtotal)}</span></div>
+          {Number(o.discount) > 0 && <div className="flex justify-between text-emerald-700"><span>Coupon {o.couponCode}</span><span>-{money(o.discount)}</span></div>}
           <div className="flex justify-between text-slate-600"><span>Delivery</span><span>{Number(o.deliveryFee) ? money(o.deliveryFee) : "Free"}</span></div>
           <div className="flex justify-between pt-1 text-lg font-extrabold"><span>Total</span><span>{money(o.total)}</span></div>
         </div>
         <p className="rounded-xl bg-slate-50 p-3.5 text-sm text-slate-600">
-          <b className="text-slate-800">Deliver to:</b> {o.shipName}, {o.shipAddress}, {o.shipCity} · {o.shipPhone}
+        <b className="text-slate-800">{o.fulfillment === "PICKUP" ? "Pick up at:" : "Deliver to:"}</b>{" "}
+          {o.fulfillment === "PICKUP" ? `${o.shipAddress} · ${o.shipName}, ${o.shipPhone}` : `${o.shipName}, ${o.shipAddress}, ${o.shipCity} · ${o.shipPhone}`}
         </p>
       </div>
       <Link href="/products" className="inline-block text-sm font-semibold text-brand">← Continue shopping</Link>

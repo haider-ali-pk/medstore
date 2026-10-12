@@ -67,6 +67,7 @@ const brandSchema = z.object({
   privacyText: z.string().max(20000).optional().nullable().or(z.literal("")),
   returnPolicy: z.string().max(20000).optional().nullable().or(z.literal("")),
   shippingPolicy: z.string().max(20000).optional().nullable().or(z.literal("")),
+    gaId: z.string().regex(/^G-[A-Z0-9]{4,15}$/, "Google Analytics ID looks like G-XXXXXXXXXX").optional().nullable().or(z.literal("")),
   deliveryFee: money.optional(),
   freeDeliveryOver: money.optional().nullable(),
   codEnabled: z.boolean().optional(),
@@ -145,7 +146,7 @@ const settingsSchema = brandSchema
     name: true, tagline: true, logoUrl: true, primaryColor: true, accentColor: true, phone: true, whatsapp: true,
     email: true, address: true, licenseNo: true, openingHours: true, deliveryFee: true, freeDeliveryOver: true, codEnabled: true, cardEnabled: true,
     walletEnabled: true, paymentInstructions: true,
-    aboutText: true, termsText: true, privacyText: true, returnPolicy: true, shippingPolicy: true,
+    aboutText: true, termsText: true, privacyText: true, returnPolicy: true, shippingPolicy: true, gaId: true,
   })
   .partial();
 
@@ -266,6 +267,119 @@ router.put("/branches/:id", async (req, res) => {
 router.delete("/branches/:id", async (req, res) => {
   await prisma.branch.deleteMany({ where: { id: req.params.id, brandId: req.brand.id } });
   afterChange(req.brand.id);
+  res.json({ ok: true });
+});
+// ---- Branch stock (what each branch has, used for "pick up from this branch")
+router.get("/branches/:id/stock", async (req, res) => {
+  const branch = await prisma.branch.findFirst({ where: { id: req.params.id, brandId: req.brand.id }, select: { id: true } });
+  if (!branch) return res.status(404).json({ error: "Branch not found" });
+  const [products, rows] = await Promise.all([
+    prisma.product.findMany({ where: { brandId: req.brand.id }, select: { id: true, name: true, sku: true }, orderBy: { name: "asc" }, take: 2000 }),
+    prisma.branchStock.findMany({ where: { branchId: branch.id } }),
+  ]);
+  const m = new Map(rows.map((r) => [r.productId, r.stock]));
+  res.json(products.map((p) => ({ ...p, stock: m.get(p.id) ?? 0 })));
+});
+router.put("/branches/:id/stock", async (req, res) => {
+  const { productId, stock } = req.body || {};
+  if (!Number.isInteger(stock) || stock < 0 || stock > 1_000_000) return res.status(400).json({ error: "Stock must be a whole number, 0 or more" });
+  const [branch, product] = await Promise.all([
+    prisma.branch.findFirst({ where: { id: req.params.id, brandId: req.brand.id }, select: { id: true } }),
+    prisma.product.findFirst({ where: { id: String(productId || ""), brandId: req.brand.id }, select: { id: true } }),
+  ]);
+  if (!branch || !product) return res.status(404).json({ error: "Branch or product not found" });
+  await prisma.branchStock.upsert({
+    where: { branchId_productId: { branchId: branch.id, productId: product.id } },
+    create: { branchId: branch.id, productId: product.id, stock },
+    update: { stock },
+  });
+  res.json({ ok: true });
+});
+
+// ---- Homepage banners
+const optB = (n) => z.string().max(n).optional().nullable().or(z.literal(""));
+const httpOnly = (u) => /^https?:\/\//i.test(u);
+const bannerBase = z.object({
+  title: z.string().min(2, "Banner title is required").max(120),
+  subtitle: optB(200),
+  buttonText: optB(30),
+  linkUrl: z.string().max(300).refine((u) => (u.startsWith("/") && !u.startsWith("//")) || httpOnly(u), "Link must start with / or https://").optional().nullable().or(z.literal("")),
+  imageUrl: z.string().url().refine(httpOnly, "Image link must start with http").optional().nullable().or(z.literal("")),
+  sortOrder: z.coerce.number().int().min(0).max(999).optional(),
+  isActive: z.boolean().optional(),
+});
+router.get("/banners", async (req, res) =>
+  res.json(await prisma.banner.findMany({ where: { brandId: req.brand.id }, orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] }))
+);
+router.post("/banners", async (req, res) => {
+  const p = bannerBase.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  const b = await prisma.banner.create({ data: { ...clean(p.data), brandId: req.brand.id } });
+  afterChange(req.brand.id);
+  res.status(201).json(b);
+});
+router.put("/banners/:id", async (req, res) => {
+  const p = bannerBase.partial().safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  const r = await prisma.banner.updateMany({ where: { id: req.params.id, brandId: req.brand.id }, data: clean(p.data) });
+  if (!r.count) return res.status(404).json({ error: "Banner not found" });
+  afterChange(req.brand.id);
+  res.json({ ok: true });
+});
+router.delete("/banners/:id", async (req, res) => {
+  await prisma.banner.deleteMany({ where: { id: req.params.id, brandId: req.brand.id } });
+  afterChange(req.brand.id);
+  res.json({ ok: true });
+});
+
+// ---- Coupon codes
+const couponBase = z.object({
+  code: z.string().trim().min(3, "Code must be at least 3 characters").max(30).regex(/^[A-Za-z0-9_-]+$/, "Code can use letters, numbers, - and _ only"),
+  type: z.enum(["PERCENT", "FIXED"]),
+  value: z.coerce.number().positive("Discount must be more than 0").max(1_000_000),
+  minSubtotal: z.union([z.coerce.number().min(0).max(10_000_000), z.literal(""), z.null()]).optional(),
+  maxUses: z.union([z.coerce.number().int().min(1).max(1_000_000), z.literal(""), z.null()]).optional(),
+  expiresAt: z.string().optional().nullable().or(z.literal("")),
+  isActive: z.boolean().optional(),
+});
+const couponData = (d) => {
+  const out = { ...d };
+  if (d.code !== undefined) out.code = d.code.toUpperCase();
+  if ("minSubtotal" in d) out.minSubtotal = d.minSubtotal === "" || d.minSubtotal == null || Number(d.minSubtotal) === 0 ? null : Number(d.minSubtotal);
+  if ("maxUses" in d) out.maxUses = d.maxUses === "" || d.maxUses == null ? null : Number(d.maxUses);
+  if ("expiresAt" in d) {
+    out.expiresAt = !d.expiresAt ? null : new Date(/^\d{4}-\d{2}-\d{2}$/.test(d.expiresAt) ? `${d.expiresAt}T23:59:59+05:00` : d.expiresAt);
+    if (out.expiresAt && isNaN(out.expiresAt.getTime())) throw Object.assign(new Error("Enter a valid expiry date"), { status: 400 });
+  }
+  return out;
+};
+router.get("/coupons", async (req, res) => res.json(await prisma.coupon.findMany({ where: { brandId: req.brand.id }, orderBy: { createdAt: "desc" } })));
+router.post("/coupons", async (req, res) => {
+  const p = couponBase.refine((d) => d.type !== "PERCENT" || d.value <= 100, "A percentage discount cannot be more than 100").safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  try {
+    const c = await prisma.coupon.create({ data: { ...couponData(p.data), brandId: req.brand.id } });
+    res.status(201).json(c);
+  } catch (e) {
+    if (e.code === "P2002") return res.status(409).json({ error: "That coupon code already exists" });
+    throw e;
+  }
+});
+router.put("/coupons/:id", async (req, res) => {
+  const p = couponBase.partial().safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  if (p.data.type === "PERCENT" && p.data.value > 100) return res.status(400).json({ error: "A percentage discount cannot be more than 100" });
+  try {
+    const r = await prisma.coupon.updateMany({ where: { id: req.params.id, brandId: req.brand.id }, data: couponData(p.data) });
+    if (!r.count) return res.status(404).json({ error: "Coupon not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.code === "P2002") return res.status(409).json({ error: "That coupon code already exists" });
+    throw e;
+  }
+});
+router.delete("/coupons/:id", async (req, res) => {
+  await prisma.coupon.deleteMany({ where: { id: req.params.id, brandId: req.brand.id } });
   res.json({ ok: true });
 });
 module.exports = { adminRouter: router, superRouter };

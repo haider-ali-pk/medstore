@@ -2,7 +2,7 @@ import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { Shield, Truck, Lock, Pill, Heart, Phone } from "@/components/Icons";
 import { getBrand, sfetch, money } from "@/lib/server";
-
+import BannerStrip from "@/components/BannerStrip";
 export default async function Home() {
   const brand = await getBrand();
   const [products, categories] = await Promise.all([sfetch("/products?limit=8"), sfetch("/categories")]);
@@ -16,6 +16,7 @@ export default async function Home() {
 
   return (
     <div className="space-y-14">
+           <BannerStrip />
       {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand via-brand to-accent text-white">
         <svg className="absolute -right-10 -top-10 h-80 w-80 text-white/10" viewBox="0 0 200 200" fill="currentColor" aria-hidden>

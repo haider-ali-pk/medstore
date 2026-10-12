@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const { z } = require("zod");
 const { prisma, slugify, bust } = require("./lib");
 const { notifyMediCore, orderPayload } = require("./medicore");
-
+const { notifyOrder } = require("./notify");
 const httpError = (status, message) => Object.assign(new Error(message), { status });
 const afterChange = (brandId) => { bust(`pub:${brandId}`); bust(`an:${brandId}`); bust("brand:"); };
 const clean = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === "" ? null : v]));
@@ -113,7 +113,10 @@ const NEXT = {
 };
 
 async function updateOrder(brand, orderId, input = {}) {
-  const before = await prisma.order.findFirst({ where: { id: orderId, brandId: brand.id }, include: { items: true } });
+  const before = await prisma.order.findFirst({
+    where: { id: orderId, brandId: brand.id },
+    include: { items: true, user: { select: { email: true } }, pickupBranch: { select: { name: true, address: true } } },
+  });
   if (!before) throw httpError(404, "Order not found");
 
   const data = {};
@@ -122,7 +125,7 @@ async function updateOrder(brand, orderId, input = {}) {
     if (!NEXT[before.status].includes(input.status))
       throw httpError(400, `An order that is ${before.status.toLowerCase()} cannot be changed to ${input.status.toLowerCase()}`);
     data.status = input.status;
-    if (input.status === "DELIVERED" && before.paymentMethod === "COD") data.paymentStatus = "PAID"; // cash collected by the rider
+    if (input.status === "DELIVERED" && before.paymentMethod === "COD") data.paymentStatus = "PAID"; // cash collected
   }
   if (input.paymentStatus && PAYMENT.includes(input.paymentStatus) && input.paymentStatus !== before.paymentStatus) {
     if (before.status === "CANCELLED" || data.status === "CANCELLED") throw httpError(400, "This order is cancelled");
@@ -131,12 +134,25 @@ async function updateOrder(brand, orderId, input = {}) {
   if (!Object.keys(data).length) return before;
 
   const order = await prisma.$transaction(async (tx) => {
-    if (data.status === "CANCELLED")
-      for (const i of before.items) await tx.product.update({ where: { id: i.productId }, data: { stock: { increment: i.quantity } } });
+    if (data.status === "CANCELLED") {
+      // stock goes back to where it was taken from: the branch (pickup) or the main stock (delivery)
+      for (const i of before.items) {
+        if (before.fulfillment === "PICKUP" && before.pickupBranchId)
+          await tx.branchStock.upsert({
+            where: { branchId_productId: { branchId: before.pickupBranchId, productId: i.productId } },
+            create: { branchId: before.pickupBranchId, productId: i.productId, stock: i.quantity },
+            update: { stock: { increment: i.quantity } },
+          });
+        else await tx.product.update({ where: { id: i.productId }, data: { stock: { increment: i.quantity } } });
+      }
+      if (before.couponCode)
+        await tx.coupon.updateMany({ where: { brandId: brand.id, code: before.couponCode, usedCount: { gt: 0 } }, data: { usedCount: { decrement: 1 } } });
+    }
     return tx.order.update({ where: { id: before.id }, data, include: { items: true } });
   });
   afterChange(brand.id);
   await notifyMediCore("order.updated", orderPayload(order, brand));
+  if (data.status) await notifyOrder("status", { ...order, user: before.user, pickupBranch: before.pickupBranch }, brand);
   return order;
 }
 

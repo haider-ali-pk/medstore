@@ -61,6 +61,7 @@ export default function AuthForm({ mode }) {
           <div><label className="label">Email</label><input type="email" className="input" required value={f.email} onChange={set("email")} autoComplete="email" /></div>
           <div><label className="label">Password</label><input type="password" className="input" required minLength={isRegister ? 8 : 1} value={f.password} onChange={set("password")} autoComplete={isRegister ? "new-password" : "current-password"} />
             {isRegister && <p className="mt-1 text-xs text-slate-400">At least 8 characters.</p>}
+            {!isRegister && <div className="mt-1.5 text-right"><Link href="/forgot-password" className="text-xs font-semibold text-brand">Forgot password?</Link></div>}
           </div>
                     {isRegister && (
             <label className="flex items-start gap-2 text-sm text-slate-600">

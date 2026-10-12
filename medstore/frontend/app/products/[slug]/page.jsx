@@ -7,7 +7,15 @@ import { getBrand, money, sfetch } from "@/lib/server";
 
 export async function generateMetadata({ params }) {
   const p = await sfetch(`/products/${params.slug}`);
-  return { title: p?.name || "Product", description: p?.description?.slice(0, 150) };
+  if (!p) return { title: "Product" };
+  const desc = (p.description || `Buy ${p.name} online.`).slice(0, 160);
+  return {
+    title: p.name,
+    description: desc,
+    alternates: { canonical: `/products/${params.slug}` },
+    openGraph: { title: p.name, description: desc, type: "website", ...(p.imageUrl ? { images: [p.imageUrl] } : {}) },
+    twitter: { card: p.imageUrl ? "summary_large_image" : "summary", title: p.name, description: desc },
+  };
 }
 
 export default async function ProductPage({ params }) {
@@ -15,9 +23,19 @@ export default async function ProductPage({ params }) {
   if (!p) notFound();
   const related = p.category ? await sfetch(`/products?category=${p.category.slug}&limit=5`) : null;
   const more = related?.items?.filter((x) => x.id !== p.id).slice(0, 4);
-
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.name,
+    description: p.description || undefined,
+    image: p.imageUrl || undefined,
+    sku: p.sku || undefined,
+    brand: p.manufacturer ? { "@type": "Brand", name: p.manufacturer } : undefined,
+    offers: { "@type": "Offer", priceCurrency: brand.currency, price: Number(p.price), availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
+  };
   return (
-    <div className="space-y-12">
+       <div className="space-y-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <div>
         <nav className="mb-5 text-sm text-slate-500">
           <Link href="/" className="hover:text-brand">Home</Link> <span className="mx-1">/</span>
