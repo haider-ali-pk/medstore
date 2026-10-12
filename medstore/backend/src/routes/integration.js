@@ -28,7 +28,23 @@ router.use((req, res, next) => {
   if (!ok) return res.status(401).json({ error: "Invalid API key" });
   next();
 });
-
+// Tells the shared brand resolver which store this call is for.
+// MediCore sends ?brand=slug; otherwise INTEGRATION_DEFAULT_BRAND; otherwise the only active store.
+router.use(async (req, _res, next) => {
+  try {
+    if (!req.headers["x-brand-slug"]) {
+      let slug = String(req.query.brand || process.env.INTEGRATION_DEFAULT_BRAND || "");
+      if (!slug) {
+        const all = await prisma.brand.findMany({ where: { isActive: true }, select: { slug: true }, take: 2 });
+        if (all.length === 1) slug = all[0].slug;
+      }
+      if (slug) req.headers["x-brand-slug"] = slug;
+    }
+    next();
+  } catch (e) {
+    next(e);
+  }
+});
 // Which store? ?brand=slug  ->  INTEGRATION_DEFAULT_BRAND  ->  the only active store.
 async function pickBrand(req, res, next) {
   const slug = String(req.query.brand || req.headers["x-brand-slug"] || process.env.INTEGRATION_DEFAULT_BRAND || "");
