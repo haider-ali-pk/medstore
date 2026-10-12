@@ -135,5 +135,17 @@ router.get("/policies", (req, res) => {
     returnPolicy: b.returnPolicy, shippingPolicy: b.shippingPolicy,
   });
 });
+// Branch list for the website
+router.get("/branches", async (req, res) =>
+  res.json(
+    await cached(`pub:${req.brand.id}:branches`, 30_000, () =>
+      prisma.branch.findMany({
+        where: { brandId: req.brand.id, isActive: true },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true, address: true, city: true, phone: true, whatsapp: true, openingHours: true, mapUrl: true },
+      })
+    )
+  )
+);
 module.exports = router;
 module.exports.publicBrand = publicBrand;

@@ -232,5 +232,40 @@ router.get("/orders/:id/prescription", async (req, res) => {
   if (!o?.prescriptionPath) return res.status(404).json({ error: "No prescription on this order" });
   res.json({ url: await signedUrl(o.prescriptionPath, 600) });
 });
+// ---- Branches (a store can have several locations)
+const optS = (n) => z.string().max(n).optional().nullable().or(z.literal(""));
+const branchSchema = z.object({
+  name: z.string().min(2, "Branch name is required").max(100),
+  address: z.string().min(3, "Address is required").max(250),
+  city: optS(60),
+  phone: optS(30),
+  whatsapp: optS(30),
+  openingHours: optS(80),
+  mapUrl: z.string().url("Map link must be a full link").refine((u) => /^https?:\/\//i.test(u), "Map link must start with http").optional().nullable().or(z.literal("")),
+  isActive: z.boolean().optional(),
+});
 
+router.get("/branches", async (req, res) =>
+  res.json(await prisma.branch.findMany({ where: { brandId: req.brand.id }, orderBy: { createdAt: "asc" } }))
+);
+router.post("/branches", async (req, res) => {
+  const p = branchSchema.safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  const b = await prisma.branch.create({ data: { ...clean(p.data), brandId: req.brand.id } });
+  afterChange(req.brand.id);
+  res.status(201).json(b);
+});
+router.put("/branches/:id", async (req, res) => {
+  const p = branchSchema.partial().safeParse(req.body);
+  if (!p.success) return res.status(400).json({ error: p.error.issues[0].message });
+  const r = await prisma.branch.updateMany({ where: { id: req.params.id, brandId: req.brand.id }, data: clean(p.data) });
+  if (!r.count) return res.status(404).json({ error: "Branch not found" });
+  afterChange(req.brand.id);
+  res.json({ ok: true });
+});
+router.delete("/branches/:id", async (req, res) => {
+  await prisma.branch.deleteMany({ where: { id: req.params.id, brandId: req.brand.id } });
+  afterChange(req.brand.id);
+  res.json({ ok: true });
+});
 module.exports = { adminRouter: router, superRouter };

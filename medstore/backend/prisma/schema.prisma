@@ -49,6 +49,7 @@ model Brand {
   whatsapp            String?
   email               String?
     address             String?
+    
   licenseNo           String?  // pharmacy / DRAP licence number, shown in the website footer
   openingHours        String?  // e.g. "Mon–Sat 9am–11pm"
     aboutText           String?  @db.Text
@@ -69,6 +70,7 @@ model Brand {
   categories Category[]
   products   Product[]
   orders     Order[]
+    branches   Branch[]
 }
 
 model User {
@@ -166,4 +168,20 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+}
+model Branch {
+  id           String   @id @default(cuid())
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name         String
+  address      String
+  city         String?
+  phone        String?
+  whatsapp     String?
+  openingHours String?
+  mapUrl       String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([brandId, isActive])
 }

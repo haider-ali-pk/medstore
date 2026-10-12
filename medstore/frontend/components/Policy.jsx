@@ -16,7 +16,8 @@ function parse(text) {
   for (const raw of String(text).replace(/\r/g, "").split("\n")) {
     const line = raw.trim();
     if (!line) { flush(); continue; }
-    if (line.startsWith("# ")) { flush(); out.push({ t: "h", v: line.slice(2) }); }
+    if (line.startsWith("## ")) { flush(); out.push({ t: "h", v: line.slice(3) }); }
+    else if (line.startsWith("# ")) { flush(); out.push({ t: "h", v: line.slice(2) }); }
     else if (line.startsWith("- ")) { if (para.length) flush(); list.push(line.slice(2)); }
     else { if (list.length) flush(); para.push(line); }
   }

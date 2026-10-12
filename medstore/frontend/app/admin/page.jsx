@@ -6,12 +6,14 @@ import Dashboard from "@/components/admin/Dashboard";
 import Products from "@/components/admin/Products";
 import Orders from "@/components/admin/Orders";
 import Settings from "@/components/admin/Settings";
-import { Chart, Box, List, Cog } from "@/components/Icons";
+import Branches from "@/components/admin/Branches";
+import { Chart, Box, List, Cog, Pin } from "@/components/Icons";
 
 const TABS = [
   ["dashboard", "Dashboard", Chart],
   ["products", "Products", Box],
   ["orders", "Orders", List],
+    ["branches", "Branches", Pin],
   ["settings", "Settings", Cog],
 ];
 
@@ -56,6 +58,7 @@ export default function Admin() {
         {tab === "dashboard" && <Dashboard {...common} go={setTab} />}
         {tab === "products" && <ProductsTab {...common} />}
         {tab === "orders" && <Orders {...common} />}
+                {tab === "branches" && <Branches call={call} notify={notify} />}
         {tab === "settings" && <Settings call={call} notify={notify} />}
       </section>
     </div>

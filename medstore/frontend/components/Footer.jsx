@@ -7,6 +7,7 @@ import { Phone, Mail, Pin, Whatsapp } from "./Icons";
 const HELP = [
   ["/about", "About us"],
   ["/contact", "Contact us"],
+  ["/branches", "Our branches"],
   ["/terms", "Terms & Conditions"],
   ["/privacy", "Privacy Policy"],
   ["/returns", "Returns & Refunds"],
