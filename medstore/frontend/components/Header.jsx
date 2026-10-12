@@ -45,14 +45,14 @@ export default function Header() {
           {open ? <X /> : <Menu />}
         </button>
 
-        <Link href="/" className="flex min-w-0 items-center gap-2 sm:shrink-0 sm:gap-2.5">
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none sm:shrink-0 sm:gap-2.5">
           {brand.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.logoUrl} alt={brand.name} className="h-8 w-auto max-w-[110px] object-contain sm:h-9 sm:max-w-[140px]" />
+            <img src={brand.logoUrl} alt={brand.name} className="h-8 w-auto max-w-[110px] shrink-0 object-contain sm:h-9 sm:max-w-[140px]" />
           ) : (
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-lg font-black text-white">+</span>
           )}
-          <span className="max-w-[110px] truncate text-base font-extrabold tracking-tight text-slate-900 sm:max-w-none sm:text-lg">{brand.name}</span>
+          <span className="min-w-0 truncate text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">{brand.name}</span>
         </Link>
 
         <form onSubmit={submit} className="relative mx-auto hidden max-w-xl flex-1 md:block">
