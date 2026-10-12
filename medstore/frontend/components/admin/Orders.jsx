@@ -20,7 +20,7 @@ const waText = (o) => {
   const pickup = o.fulfillment === "PICKUP";
   const s = { PENDING: "has been received", CONFIRMED: pickup ? "is confirmed and being prepared for pickup" : "is confirmed and being prepared", SHIPPED: pickup ? "is ready for pickup" : "has been dispatched and is on its way", DELIVERED: pickup ? "has been collected. Thank you!" : "has been delivered. Thank you!", CANCELLED: "has been cancelled" }[o.status];
   return `Hello ${o.shipName}, your order ${orderRef(o)} ${s}.`;
-}; `https://wa.me/${String(phone || "").replace(/\D/g, "").replace(/^0/, "92")}`;
+};
 
 export default function Orders({ call, money, notify }) {
   const [orders, setOrders] = useState(null);
@@ -72,7 +72,7 @@ export default function Orders({ call, money, notify }) {
           </div>
           <p className="text-sm text-slate-700">{o.items.map((i) => `${i.name} ×${i.quantity}`).join(", ")}</p>
           <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
-         {o.fulfillment === "PICKUP" && <b>PICKUP · </b>}{o.shipAddress}, {o.shipCity} · {o.shipPhone}
+            {o.fulfillment === "PICKUP" && <b>PICKUP · </b>}{o.shipAddress}, {o.shipCity} · {o.shipPhone}
             {Number(o.discount) > 0 && <><br /><b>Coupon {o.couponCode}: -{money(o.discount)}</b></>}
             {o.notes && <><br /><i>Note: {o.notes}</i></>}
           </p>
@@ -85,7 +85,7 @@ export default function Orders({ call, money, notify }) {
             {o.paymentRef && <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800">Txn: <b>{o.paymentRef}</b></span>}
             {o.paymentStatus !== "PAID" && o.status !== "CANCELLED" && <button className="btn btn-outline btn-sm" onClick={() => patch(o.id, { paymentStatus: "PAID" })}>Mark paid</button>}
             {o.hasPrescription && <button className="btn btn-outline btn-sm !border-red-300 !text-red-700" onClick={() => openRx(o.id)}>View prescription</button>}
-           <a href={wa(o.shipPhone, waText(o))}target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[#128C7E] hover:underline">
+            <a href={wa(o.shipPhone, waText(o))} target="_blank" rel="noreferrer" className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-[#128C7E] hover:underline">
               <Whatsapp size={16} /> WhatsApp customer
             </a>
           </div>
